@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A R Fresh Market</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom Styles for smoothness */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+
+    <!-- NAVIGATION BAR -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center gap-2 cursor-pointer" onclick="app.setView('shop')">
+                    <i data-lucide="store" class="h-8 w-8 text-blue-600"></i>
+                    <span class="font-bold text-xl tracking-tight text-blue-900 hidden sm:block">A R Fresh <span class="text-blue-500">Market</span></span>
+                    <span class="font-bold text-xl tracking-tight text-blue-900 sm:hidden">A R <span class="text-blue-500">Fresh</span></span>
+                </div>
+                
+                <!-- Nav Actions -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <button onclick="app.setView('shop')" id="btn-shop" class="px-3 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700">
+                        Shop
+                    </button>
+
+                    <!-- Admin/Supplier Toggle -->
+                    <div id="admin-controls" class="hidden flex items-center gap-2">
+                        <button onclick="app.setView('admin')" id="btn-admin" class="px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-500 hover:text-gray-700">
+                            Admin
+                        </button>
+                        <button onclick="app.logoutAdmin()" class="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Logout Admin">
+                            <i data-lucide="log-out" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+
+                    <button id="btn-login-trigger" onclick="app.openLoginModal()" class="flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors">
+                        <i data-lucide="lock" class="h-4 w-4"></i> <span class="hidden sm:inline">Supplier</span>
+                    </button>
+                    
+                    <!-- Cart Button -->
+                    <button id="btn-cart" onclick="app.openCart()" class="relative p-2 text-gray-600 hover:text-blue-600 transition-colors">
+                        <i data-lucide="shopping-cart" class="h-6 w-6"></i>
+                        <span id="cart-badge" class="hidden absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-500 rounded-full">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT AREA -->
+    <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 fade-in">
+        <!-- Views will be injected here by JavaScript -->
+        <div id="loading-screen" class="min-h-[50vh] flex flex-col items-center justify-center">
+            <div class="loader mb-4"></div>
+            <p class="text-gray-500">Connecting to Market...</p>
+        </div>
+    </main>
+
+    <!-- MODALS -->
+    
+    <!-- 1. Cart Modal -->
+    <div id="cart-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="app.closeCart()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex justify-between items-center mb-5 border-b pb-2">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="cart-title">Current Order</h3>
+                        <button onclick="app.closeCart()" class="text-gray-400 hover:text-gray-500">
+                            <i data-lucide="x" class="h-6 w-6"></i>
+                        </button>
+                    </div>
+                    <div id="cart-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Admin Login Modal -->
+    <div id="login-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('login-modal').classList.add('hidden')"></div>
+            <div class="bg-white rounded-lg p-6 w-full max-w-sm relative z-10 shadow-xl">
+                <div class="text-center mb-4">
+                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-2">
+                        <i data-lucide="lock" class="h-6 w-6 text-green-600"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900">Supplier Access</h3>
+                    <p class="text-sm text-gray-500">Please enter your secure PIN.</p>
+                </div>
+                <input type="password" id="admin-pin" class="w-full text-center border p-2 rounded mb-4 text-2xl tracking-widest focus:ring-green-500 focus:border-green-500" placeholder="PIN">
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('login-modal').classList.add('hidden')" class="flex-1 bg-gray-100 py-2 rounded hover:bg-gray-200">Cancel</button>
+                    <button onclick="app.loginAdmin()" class="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700">Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Add Product Modal -->
+    <div id="add-product-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('add-product-modal').classList.add('hidden')"></div>
+            <div class="bg-white rounded-lg p-6 w-full max-w-md relative z-10 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Add New Product</h3>
+                </div>
+                <form onsubmit="app.addProduct(event)" class="space-y-4">
+                    <input type="text" name="name" id="add-name" required placeholder="Product Name (e.g. Sourdough Bread)" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="number" name="price" id="add-price" step="0.01" required placeholder="Price (€)" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                        <input type="text" name="unit" id="add-unit" required placeholder="Unit (e.g., kg)" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                         <select name="category" id="add-category" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                            <option>Essentials</option><option>Grains</option><option>Beverages</option>
+                            <option>Snacks</option><option>Canned Goods</option><option>Cleaning</option>
+                         </select>
+                         <!-- URL Input Only -->
+                        <input type="url" name="imageUrl" id="add-image-url" placeholder="Image URL (https://...)" class="w-full border p-2 rounded text-sm focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <!-- Stock Field -->
+                    <input type="number" name="stock" id="add-stock" required placeholder="Stock Quantity" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                    
+                    <!-- NEW: Description Field -->
+                    <textarea name="description" id="add-description" rows="2" placeholder="Product Description (optional)" class="w-full border p-2 rounded text-sm focus:ring-green-500 focus:border-green-500"></textarea>
+                    
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Add Product</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Edit Product Modal -->
+    <div id="edit-product-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('edit-product-modal').classList.add('hidden')"></div>
+            <div class="bg-white rounded-lg p-6 w-full max-w-md relative z-10 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Edit Product</h3>
+                </div>
+                <form onsubmit="app.updateProduct(event)" class="space-y-4">
+                    <input type="hidden" name="id" id="edit-product-id">
+                    <input type="text" name="name" id="edit-name" required placeholder="Product Name" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                    <div class="grid grid-cols-2 gap-4">
+                        <input type="number" name="price" id="edit-price" step="0.01" required placeholder="Price (€)" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                        <input type="text" name="unit" id="edit-unit" required placeholder="Unit (e.g., kg)" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                         <select name="category" id="edit-category" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                            <option>Essentials</option><option>Grains</option><option>Beverages</option>
+                            <option>Snacks</option><option>Canned Goods</option><option>Cleaning</option>
+                         </select>
+                        <!-- URL Input Only -->
+                        <input type="url" name="imageUrl" id="edit-image-url" placeholder="Image URL (https://...)" class="w-full border p-2 rounded text-sm focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <!-- Stock Field -->
+                    <input type="number" name="stock" id="edit-stock" required placeholder="Stock Quantity" class="w-full border p-2 rounded focus:ring-green-500 focus:border-green-500">
+                    
+                    <!-- NEW: Description Field -->
+                    <textarea name="description" id="edit-description" rows="2" placeholder="Product Description (optional)" class="w-full border p-2 rounded text-sm focus:ring-green-500 focus:border-green-500"></textarea>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2">
+                         <button type="button" onclick="document.getElementById('edit-product-modal').classList.add('hidden')" class="flex-1 bg-gray-100 py-2 rounded text-gray-700 font-medium hover:bg-gray-200">Cancel</button>
+                         <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 font-medium">Save Changes</button>
+                    </div>
+                </form>
+                
+                <!-- Delete Button Section -->
+                <div class="border-t pt-4 mt-4">
+                    <button type="button" id="btn-delete" onclick="app.deleteProduct()" class="w-full flex items-center justify-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 py-2 rounded transition-colors text-sm font-medium border border-transparent hover:border-red-100">
+                        <i data-lucide="trash-2" class="h-4 w-4"></i> Delete Product
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white transform transition-all duration-300 translate-y-20 opacity-0 z-50"></div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // --- CONFIGURATION ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBfY1ZuMfIHu3yjpSOqIdTbOdlWAo7CBRo",
+          authDomain: "bulk-3139a.firebaseapp.com",
+          projectId: "bulk-3139a",
+          storageBucket: "bulk-3139a.firebasestorage.app",
+          messagingSenderId: "951883061438",
+          appId: "1:951883061438:web:aedb5826770baabc6826ef",
+          measurementId: "G-BBRYDJV6ZT"
+        };
+
+        const appInstance = initializeApp(firebaseConfig);
+        const auth = getAuth(appInstance);
+        const db = getFirestore(appInstance);
+        const appId = 'bulk-order-app-v1';
+
+        // --- STATE MANAGEMENT ---
+        const state = {
+            user: null,
+            view: 'shop', // 'shop' or 'admin'
+            isAdmin: false,
+            cart: [],
+            products: [],
+            orders: [],
+            cartStep: 'cart' // 'cart' or 'checkout'
+        };
+
+        // --- MAIN APP CONTROLLER ---
+        window.app = {
+            init: () => {
+                // Auth Listener
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        state.user = user;
+                        app.loadData();
+                    } else {
+                        // FIX: Better error handling for disabled Auth
+                        signInAnonymously(auth).catch((error) => {
+                            console.error("Auth Error:", error);
+                            // Catch admin-restricted-operation (Anonymous disabled)
+                            const codes = ['auth/admin-restricted-operation', 'auth/configuration-not-found', 'auth/operation-not-allowed', 'auth/internal-error'];
+                            if (codes.includes(error.code)) {
+                                const main = document.getElementById('main-content');
+                                main.innerHTML = `
+                                    <div class="flex flex-col items-center justify-center p-8 text-center bg-red-50 rounded-xl border border-red-200 mt-10">
+                                        <i data-lucide="alert-triangle" class="h-12 w-12 text-red-600 mb-4"></i>
+                                        <h3 class="text-xl font-bold text-red-900 mb-2">Authentication Error</h3>
+                                        <p class="text-red-700 mb-4">Firebase Authentication is blocked. (${error.code})</p>
+                                        <div class="text-left bg-white p-6 rounded-lg shadow-sm text-sm text-gray-700 w-full max-w-md">
+                                            <p class="font-bold mb-2">Required Fix:</p>
+                                            <ol class="list-decimal pl-4 space-y-2">
+                                                <li>Go to <a href="https://console.firebase.google.com/" target="_blank" class="text-blue-600 underline hover:text-blue-800">Firebase Console</a></li>
+                                                <li>Select your project <strong>bulk-3139a</strong></li>
+                                                <li>Go to <strong>Build > Authentication</strong> (left menu)</li>
+                                                <li>Click <strong>Sign-in method</strong> tab</li>
+                                                <li>Click <strong>Anonymous</strong> and toggle <strong>Enable</strong></li>
+                                                <li>Click <strong>Save</strong></li>
+                                            </ol>
+                                        </div>
+                                        <button onclick="window.location.reload()" class="mt-6 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">
+                                            I've done this, Try Again
+                                        </button>
+                                    </div>
+                                `;
+                                lucide.createIcons();
+                            }
+                        });
+                    }
+                });
+                lucide.createIcons();
+            },
+
+            loadData: () => {
+                // Load Products
+                const prodRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+                onSnapshot(prodRef, (snap) => {
+                    state.products = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    if (state.view === 'admin') app.render(); // Re-render admin if products change
+                    else if (state.view === 'shop') app.render(); // Re-render shop
+                }, (error) => {
+                    if (error.code === 'permission-denied') {
+                        app.showToast("Firestore Error: Permissions Denied. Enable Test Mode.", "error");
+                    }
+                });
+
+                // Load Orders
+                const orderRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
+                const q = query(orderRef, orderBy('createdAt', 'desc')); // Simple sorting
+                onSnapshot(orderRef, (snap) => { // Using simple snapshot for robustness
+                    let orders = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    // Manual sort since compound queries might need index
+                    orders.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                    state.orders = orders;
+                    if(state.view === 'admin') app.render();
+                });
+            },
+
+            render: () => {
+                const main = document.getElementById('main-content');
+                const btnShop = document.getElementById('btn-shop');
+                const btnAdmin = document.getElementById('btn-admin');
+                
+                // Toggle active nav styling
+                if (state.view === 'shop') {
+                    main.innerHTML = app.renderShop();
+                    btnShop.className = "px-3 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 text-blue-700";
+                    if(state.isAdmin) btnAdmin.className = "px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-500 hover:text-gray-700";
+                    document.getElementById('btn-cart').classList.remove('hidden');
+                } else {
+                    main.innerHTML = app.renderAdmin();
+                    btnShop.className = "px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-500 hover:text-gray-700";
+                    btnAdmin.className = "px-3 py-2 rounded-md text-sm font-medium transition-colors bg-green-50 text-green-700";
+                    document.getElementById('btn-cart').classList.add('hidden');
+                }
+
+                // Render Cart Badge
+                const badge = document.getElementById('cart-badge');
+                const count = state.cart.reduce((a, b) => a + b.quantity, 0);
+                if (count > 0) {
+                    badge.innerText = count;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+
+                lucide.createIcons();
+            },
+
+            // --- VIEWS ---
+            setView: (view) => {
+                state.view = view;
+                app.render();
+            },
+
+            renderShop: () => {
+                if(state.products.length === 0) {
+                     return `
+                        <div class="text-center py-12 bg-white rounded-lg shadow-sm border border-dashed border-gray-300">
+                            <i data-lucide="package" class="mx-auto h-12 w-12 text-gray-400"></i>
+                            <h3 class="mt-2 text-sm font-medium text-gray-900">No products listed</h3>
+                            <p class="mt-1 text-sm text-gray-500">Switch to Supplier View (Click Lock Icon) to add products.</p>
+                        </div>
+                     `;
+                }
+
+                return `
+                    <div class="mb-8">
+                        <h2 class="text-2xl font-bold text-gray-900">Wholesale Catalog</h2>
+                        <p class="text-gray-500">Bulk pricing available for all verified shop owners.</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-8">
+                        ${state.products.map(p => {
+                            const isSoldOut = (p.stock || 0) <= 0;
+                            return `
+                            <div class="group bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col h-full ${isSoldOut ? 'opacity-75' : ''}">
+                                <div class="w-full h-48 bg-gray-50 flex items-center justify-center text-6xl relative">
+                                    ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover ${isSoldOut ? 'grayscale' : ''}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+                                    <span style="${p.imageUrl ? 'display:none' : ''}">📦</span>
+                                    ${isSoldOut ? `<div class="absolute inset-0 flex items-center justify-center bg-black/10"><span class="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm">Sold Out</span></div>` : ''}
+                                </div>
+                                <div class="p-4 flex flex-col flex-grow justify-between">
+                                    <div>
+                                        <h3 class="text-lg font-medium text-gray-900">${p.name}</h3>
+                                        <p class="text-sm text-gray-500 mt-1 line-clamp-2">${p.description || ''}</p>
+                                        <div class="flex justify-between items-center mt-2">
+                                            <p class="text-sm text-gray-500">${p.unit}</p>
+                                            <p class="text-xs font-semibold ${isSoldOut ? 'text-red-500' : 'text-green-600'}">
+                                                ${isSoldOut ? 'Out of Stock' : `${p.stock} Available`}
+                                            </p>
+                                        </div>
+                                        <p class="mt-2 text-xl font-bold text-blue-600">€${p.price}</p>
+                                    </div>
+                                    <button 
+                                        onclick="app.addToCart('${p.id}')" 
+                                        ${isSoldOut ? 'disabled' : ''}
+                                        class="mt-4 w-full flex items-center justify-center gap-2 ${isSoldOut ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
+                                        ${isSoldOut ? 'Sold Out' : '<i data-lucide="plus" class="h-4 w-4"></i> Add to Order'}
+                                    </button>
+                                </div>
+                            </div>
+                        `}).join('')}
+                    </div>
+                `;
+            },
+
+            renderAdmin: () => {
+                const pending = state.orders.filter(o => o.status === 'pending').length;
+                const completed = state.orders.filter(o => o.status === 'completed').length;
+                const revenue = state.orders.reduce((acc, o) => acc + (o.total || 0), 0);
+
+                return `
+                     <div class="space-y-6">
+                        <div class="flex flex-col sm:flex-row justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100 gap-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-900">Supplier Dashboard</h2>
+                                <p class="text-gray-500">Manage incoming orders.</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="document.getElementById('add-product-modal').classList.remove('hidden')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+                                    <i data-lucide="plus" class="h-4 w-4"></i> Add Product
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-green-50 p-6 rounded-xl border border-green-100">
+                                <h3 class="text-green-800 font-medium">Pending</h3>
+                                <p class="text-3xl font-bold text-green-900">${pending}</p>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl border border-gray-200">
+                                <h3 class="text-gray-500 font-medium">Completed</h3>
+                                <p class="text-3xl font-bold text-gray-900">${completed}</p>
+                            </div>
+                            <div class="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
+                                <h3 class="text-emerald-800 font-medium">Revenue</h3>
+                                <p class="text-3xl font-bold text-emerald-900">€${revenue.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Product Inventory Section -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-6">
+                            <div class="px-6 py-4 border-b bg-gray-50 font-semibold text-gray-700 flex justify-between items-center">
+                                <span>Product Inventory</span>
+                                <span class="text-xs font-normal text-gray-500">${state.products.length} Items</span>
+                            </div>
+                            <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                                ${state.products.map(p => `
+                                    <div class="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                        <div class="flex items-center gap-3">
+                                            <div class="h-10 w-10 bg-gray-100 rounded flex items-center justify-center text-xl overflow-hidden border border-gray-200">
+                                                ${p.imageUrl ? `<img src="${p.imageUrl}" class="h-full w-full object-cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+                                                <span style="${p.imageUrl ? 'display:none' : ''}" class="flex items-center justify-center w-full h-full">📦</span>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900">${p.name}</div>
+                                                <div class="text-xs text-gray-500">€${p.price} / ${p.unit}</div>
+                                                <div class="text-xs font-semibold ${p.stock <= 5 ? 'text-red-500' : 'text-gray-500'}">Stock: ${p.stock || 0}</div>
+                                            </div>
+                                        </div>
+                                        <button onclick="app.openEditProduct('${p.id}')" class="flex items-center gap-1 text-green-600 hover:text-green-800 text-sm font-medium px-3 py-1 rounded hover:bg-green-50 transition-colors">
+                                            <i data-lucide="edit-2" class="h-3 w-3"></i> Edit
+                                        </button>
+                                    </div>
+                                `).join('')}
+                                ${state.products.length === 0 ? '<div class="p-4 text-center text-gray-500 italic">No products yet. Add some!</div>' : ''}
+                            </div>
+                        </div>
+
+                        <!-- Orders List -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-6">
+                            <div class="px-6 py-4 border-b bg-gray-50 font-semibold text-gray-700">Recent Orders</div>
+                            <div class="divide-y divide-gray-100">
+                                ${state.orders.map(o => `
+                                    <div class="p-6 hover:bg-gray-50 transition-colors">
+                                        <div class="flex flex-col md:flex-row justify-between mb-4">
+                                            <div>
+                                                <div class="flex items-center gap-2">
+                                                    <h4 class="font-bold text-lg text-gray-900">${o.shopName || 'Unknown Shop'}</h4>
+                                                    <span class="text-xs px-2 py-1 rounded-full font-medium ${o.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">${(o.status || 'pending').toUpperCase()}</span>
+                                                </div>
+                                                <div class="text-sm text-gray-500 mt-1">
+                                                    <i data-lucide="user" class="inline h-3 w-3"></i> ${o.ownerName || 'Unknown'} | 
+                                                    <i data-lucide="clock" class="inline h-3 w-3"></i> Needed: ${o.dateNeeded || 'ASAP'}
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-2xl font-bold text-gray-900">€${(o.total || 0).toFixed(2)}</div>
+                                            </div>
+                                        </div>
+                                        <div class="bg-gray-50 rounded p-3 text-sm text-gray-600 mb-3">
+                                            ${(o.items || []).map(i => `<div>${i.quantity}x ${i.name}</div>`).join('')}
+                                            ${o.notes ? `<div class="mt-2 italic text-gray-500">"${o.notes}"</div>` : ''}
+                                        </div>
+                                        <div class="flex justify-end gap-2">
+                                            ${o.status !== 'completed' ? `
+                                                <button onclick="app.updateStatus('${o.id}', 'completed')" class="flex items-center gap-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">
+                                                    <i data-lucide="check-circle" class="h-4 w-4"></i> Complete
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                     </div>
+                `;
+            },
+
+            // --- ACTIONS ---
+            addToCart: (id) => {
+                const p = state.products.find(x => x.id === id);
+                if ((p.stock || 0) <= 0) {
+                    app.showToast("Product is Sold Out", "error");
+                    return;
+                }
+                
+                const existing = state.cart.find(x => x.id === id);
+                const currentQty = existing ? existing.quantity : 0;
+                
+                if (currentQty + 1 > (p.stock || 0)) {
+                    app.showToast(`Only ${p.stock} available in stock`, "error");
+                    return;
+                }
+
+                if (existing) existing.quantity++;
+                else state.cart.push({ ...p, quantity: 1 });
+                app.render(); // Update badge
+                app.showToast(`Added ${p.name} to cart`);
+            },
+
+            openCart: () => {
+                state.cartStep = 'cart';
+                // FIX: Update state via helper to avoid global scope issues in HTML onclicks
+                app.setCartStep('cart'); 
+                document.getElementById('cart-modal').classList.remove('hidden');
+            },
+            
+            setCartStep: (step) => {
+                state.cartStep = step;
+                app.renderCartModal();
+            },
+
+            closeCart: () => {
+                document.getElementById('cart-modal').classList.add('hidden');
+            },
+
+            renderCartModal: () => {
+                const container = document.getElementById('cart-content');
+                const title = document.getElementById('cart-title');
+                const total = state.cart.reduce((a, b) => a + (b.price * b.quantity), 0);
+
+                if (state.cartStep === 'cart') {
+                    title.innerText = "Current Order";
+                    if (state.cart.length === 0) {
+                        container.innerHTML = `<p class="text-center py-8 text-gray-500">Your cart is empty.</p>`;
+                        return;
+                    }
+                    container.innerHTML = `
+                        <div class="space-y-4 max-h-96 overflow-y-auto mb-4">
+                            ${state.cart.map((item, idx) => {
+                                const stock = item.stock || 0;
+                                return `
+                                <div class="flex justify-between items-center bg-gray-50 p-3 rounded">
+                                    <div><div class="font-medium">${item.name}</div><div class="text-sm text-gray-500">€${item.price} / ${item.unit}</div></div>
+                                    <div class="flex items-center gap-3">
+                                        <button onclick="app.updateQty(${idx}, -1)" class="p-1 hover:bg-gray-200 rounded"><i data-lucide="minus" class="h-4 w-4"></i></button>
+                                        <span class="font-medium w-6 text-center">${item.quantity}</span>
+                                        <button onclick="app.updateQty(${idx}, 1)" class="p-1 hover:bg-gray-200 rounded" ${item.quantity >= stock ? 'disabled style="opacity:0.5"' : ''}><i data-lucide="plus" class="h-4 w-4"></i></button>
+                                    </div>
+                                    <div class="w-16 text-right font-medium">€${(item.price * item.quantity).toFixed(2)}</div>
+                                </div>
+                            `}).join('')}
+                        </div>
+                        <div class="border-t pt-4">
+                            <div class="flex justify-between text-xl font-bold mb-4"><span>Total</span><span>€${total.toFixed(2)}</span></div>
+                            <button onclick="app.setCartStep('checkout')" class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium">Proceed to Checkout</button>
+                        </div>
+                    `;
+                } else {
+                    title.innerText = "Checkout Details";
+                    container.innerHTML = `
+                        <form onsubmit="app.submitOrder(event)" class="space-y-4">
+                            <div><label class="text-sm font-medium">Shop Name</label><input type="text" name="shopName" required class="w-full border p-2 rounded"></div>
+                            <div><label class="text-sm font-medium">Owner Name</label><input type="text" name="ownerName" required class="w-full border p-2 rounded"></div>
+                            <div><label class="text-sm font-medium">Date Needed</label><input type="date" name="dateNeeded" required class="w-full border p-2 rounded"></div>
+                            <div><label class="text-sm font-medium">Notes</label><textarea name="notes" class="w-full border p-2 rounded"></textarea></div>
+                            <div class="flex gap-3 pt-2">
+                                <button type="button" onclick="app.setCartStep('cart')" class="flex-1 bg-gray-100 py-3 rounded-lg">Back</button>
+                                <button type="submit" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium">Confirm Order</button>
+                            </div>
+                        </form>
+                    `;
+                }
+                lucide.createIcons();
+            },
+
+            updateQty: (idx, delta) => {
+                const item = state.cart[idx];
+                const newQty = item.quantity + delta;
+                
+                if (delta > 0) {
+                    const p = state.products.find(x => x.id === item.id);
+                    if (newQty > (p.stock || 0)) {
+                        app.showToast("Cannot add more: Stock limit reached", "error");
+                        return;
+                    }
+                }
+
+                item.quantity = newQty;
+                if(item.quantity <= 0) state.cart.splice(idx, 1);
+                app.renderCartModal();
+                app.render(); // update badge
+            },
+
+            submitOrder: async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const order = {
+                    items: state.cart,
+                    total: state.cart.reduce((a, b) => a + (b.price * b.quantity), 0),
+                    status: 'pending',
+                    shopName: formData.get('shopName'),
+                    ownerName: formData.get('ownerName'),
+                    dateNeeded: formData.get('dateNeeded'),
+                    notes: formData.get('notes'),
+                    createdAt: serverTimestamp()
+                };
+                
+                try {
+                    // Save Order
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), order);
+                    
+                    // Decrease Stock for each item
+                    for (const item of state.cart) {
+                        const productRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', item.id);
+                        const currentStock = item.stock || 0;
+                        const newStock = Math.max(0, currentStock - item.quantity);
+                        await updateDoc(productRef, { stock: newStock });
+                    }
+
+                    app.showToast("Order Placed Successfully!");
+                    state.cart = [];
+                    app.closeCart();
+                    app.render(); // Refresh products to show new stock
+                } catch(err) {
+                    console.error(err);
+                    app.showToast("Error placing order", "error");
+                }
+            },
+
+            // --- ADMIN ACTIONS ---
+            openLoginModal: () => document.getElementById('login-modal').classList.remove('hidden'),
+            
+            loginAdmin: () => {
+                const pin = document.getElementById('admin-pin').value;
+                if (pin === '1234') {
+                    state.isAdmin = true;
+                    document.getElementById('admin-controls').classList.remove('hidden');
+                    document.getElementById('login-modal').classList.add('hidden');
+                    document.getElementById('btn-login-trigger').classList.add('hidden');
+                    app.setView('admin');
+                    app.showToast("Supplier Access Granted");
+                } else {
+                    alert("Incorrect PIN");
+                }
+            },
+            
+            logoutAdmin: () => {
+                state.isAdmin = false;
+                document.getElementById('admin-controls').classList.add('hidden');
+                document.getElementById('btn-login-trigger').classList.remove('hidden');
+                app.setView('shop');
+                app.showToast("Logged out");
+            },
+
+            addProduct: async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const product = {
+                    name: formData.get('name'),
+                    price: parseFloat(formData.get('price')),
+                    unit: formData.get('unit'),
+                    category: formData.get('category'),
+                    imageUrl: formData.get('imageUrl'),
+                    description: formData.get('description'),
+                    stock: parseInt(formData.get('stock')) || 0, // NEW
+                    createdAt: serverTimestamp()
+                };
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), product);
+                    document.getElementById('add-product-modal').classList.add('hidden');
+                    e.target.reset();
+                    app.showToast("Product Added");
+                } catch (err) {
+                    console.error(err);
+                    app.showToast("Error adding product", "error");
+                }
+            },
+
+            // NEW: Open Edit Modal with Data
+            openEditProduct: (id) => {
+                const p = state.products.find(x => x.id === id);
+                if(!p) return;
+                
+                document.getElementById('edit-product-id').value = id;
+                document.getElementById('edit-name').value = p.name;
+                document.getElementById('edit-price').value = p.price;
+                document.getElementById('edit-unit').value = p.unit;
+                document.getElementById('edit-category').value = p.category;
+                document.getElementById('edit-image-url').value = p.imageUrl || ''; 
+                document.getElementById('edit-description').value = p.description || '';
+                document.getElementById('edit-stock').value = p.stock || 0; // NEW
+                
+                // RESET DELETE BUTTON STATE
+                const btn = document.getElementById('btn-delete');
+                if(btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="trash-2" class="h-4 w-4"></i> Delete Product';
+                    lucide.createIcons();
+                }
+                
+                document.getElementById('edit-product-modal').classList.remove('hidden');
+            },
+
+            // NEW: Update Product
+            updateProduct: async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const id = formData.get('id');
+                const updates = {
+                    name: formData.get('name'),
+                    price: parseFloat(formData.get('price')),
+                    unit: formData.get('unit'),
+                    category: formData.get('category'),
+                    imageUrl: formData.get('imageUrl'),
+                    description: formData.get('description'),
+                    stock: parseInt(formData.get('stock')) || 0 // NEW
+                };
+                
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), updates);
+                    document.getElementById('edit-product-modal').classList.add('hidden');
+                    app.showToast("Product Updated Successfully");
+                } catch(err) {
+                    console.error(err);
+                    app.showToast("Error updating product", "error");
+                }
+            },
+
+            // NEW: Delete Product
+            deleteProduct: async () => {
+                const id = document.getElementById('edit-product-id').value;
+                const btn = document.getElementById('btn-delete');
+                
+                if(!id) return;
+
+                // Removed blocking confirm() to avoid browser issues
+                // Added loading state to button
+                if(btn) {
+                    btn.disabled = true;
+                    btn.innerText = "Deleting...";
+                }
+
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                    document.getElementById('edit-product-modal').classList.add('hidden');
+                    app.showToast("Product Deleted");
+                    
+                    // Reset button state on success too
+                    if(btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i data-lucide="trash-2" class="h-4 w-4"></i> Delete Product';
+                        lucide.createIcons();
+                    }
+                } catch(err) {
+                    console.error("Delete failed:", err);
+                    app.showToast("Error: " + err.message, "error");
+                    if(btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i data-lucide="trash-2" class="h-4 w-4"></i> Delete Product';
+                        lucide.createIcons();
+                    }
+                }
+            },
+
+            updateStatus: async (id, status) => {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id), { status });
+                app.showToast(`Order marked ${status}`);
+            },
+
+            // Seed function removed
+
+            showToast: (msg, type = 'success') => {
+                const toast = document.getElementById('toast');
+                toast.innerText = msg;
+                toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white transform transition-all duration-300 ${type === 'success' ? 'bg-green-600' : 'bg-red-600'} z-50`;
+                setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+            }
+        };
+
+        // Start App
+        app.init();
+    </script>
+</body>
+</html>
